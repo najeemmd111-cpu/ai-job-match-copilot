@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job-Match Copilot</title>
+  <meta name="description" content="Compare your resume with a job description, see which skills match, and download a tailored resume.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='4' y='12' width='24' height='9' rx='2' fill='%23FFE55C'/><rect x='7' y='5' width='18' height='22' rx='2' fill='none' stroke='%23152238' stroke-width='2.5'/></svg>">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="12" width="24" height="9" rx="2" fill="#FFE55C"/><rect x="7" y="5" width="18" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="2.5"/></svg>
+      Job-Match Copilot
+    </a>
+    <a class="toplink" href="/docs">API docs</a>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h1>Read your resume the way <span class="mark">a recruiter will</span>.</h1>
+      <p>Drop in your resume and the job you want. You'll see which skills line up, which ones the job expects that you haven't shown, and get a version of your resume rewritten for this role.</p>
+    </section>
+
+    <form id="analyze-form" class="desk" novalidate>
+      <div class="sheet sheet--resume">
+        <label class="sheet-title" for="resume-input">Your resume</label>
+        <label class="dropzone" id="dropzone" for="resume-input">
+          <input id="resume-input" name="resume" type="file" accept=".pdf,.txt" required>
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 18v-6M9 15l3-3 3 3"/></svg>
+          <span class="drop-main" id="drop-main">Drop your PDF here or <u>browse</u></span>
+          <span class="drop-sub" id="drop-sub">PDF or TXT, up to 5 MB</span>
+        </label>
+      </div>
+
+      <div class="sheet sheet--job">
+        <label class="sheet-title" for="job-input">The job you want</label>
+        <textarea id="job-input" name="job" rows="11" placeholder="Paste the responsibilities and requirements from the job post. Leave out the company's legal and benefits text; it only adds noise." required></textarea>
+      </div>
+
+      <div class="desk-actions">
+        <button class="btn btn--primary" id="analyze-btn" type="submit">Compare resume with job</button>
+        <p class="form-error" id="form-error" role="alert"></p>
+      </div>
+    </form>
+
+    <section class="report" id="report" hidden aria-live="polite">
+      <div class="verdict">
+        <div class="score" aria-label="Match score">
+          <span class="score-num" id="score-num">0</span><span class="score-max">/100</span>
+        </div>
+        <div class="verdict-text">
+          <h2 id="verdict-title">How well you match</h2>
+          <p id="verdict-sub"></p>
+          <dl class="breakdown">
+            <div><dt>Meaning overlap</dt><dd><span class="meter"><span id="meter-sem"></span></span><b id="val-sem"></b></dd></div>
+            <div><dt>Skills covered</dt><dd><span class="meter"><span id="meter-cov"></span></span><b id="val-cov"></b></dd></div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="skills">
+        <div>
+          <h3>Skills you've shown</h3>
+          <ul class="skill-list" id="matched"></ul>
+        </div>
+        <div>
+          <h3>Skills the job asks for that are missing</h3>
+          <ul class="skill-list skill-list--missing" id="missing"></ul>
+        </div>
+      </div>
+
+      <div class="workbench">
+        <div class="tabs" role="tablist" aria-label="Tools">
+          <button role="tab" aria-selected="true" aria-controls="panel-tailor" id="tab-tailor">Tailored resume</button>
+          <button role="tab" aria-selected="false" aria-controls="panel-bullets" id="tab-bullets" tabindex="-1">Stronger bullet points</button>
+          <button role="tab" aria-selected="false" aria-controls="panel-questions" id="tab-questions" tabindex="-1">Interview prep</button>
+        </div>
+
+        <div class="panel" role="tabpanel" id="panel-tailor" aria-labelledby="tab-tailor">
+          <div class="panel-head">
+            <p>Your whole resume, rewritten for this job. Start here, then use <i>Edit with AI</i> below to make your own changes.</p>
+            <button class="btn btn--primary" data-run="tailor">Tailor my resume</button>
+          </div>
+          <div class="output" id="out-tailor"></div>
+
+          <section class="editor" id="editor" aria-labelledby="editor-title">
+            <div class="editor-head">
+              <div>
+                <h3 id="editor-title">Edit with AI</h3>
+                <p>Tell it what to change in your own words. Every change is re-scored against the job, and you can undo it.</p>
+              </div>
+              <p class="live-score" aria-live="polite">Current score<br><b id="live-score">–</b><span>/100</span></p>
+            </div>
+
+            <ol class="edit-log" id="edit-log"></ol>
+
+            <div class="suggestions" id="suggestions" aria-label="Suggested changes"></div>
+
+            <form class="edit-form" id="edit-form">
+              <label class="visually-hidden" for="edit-input">What should change in your resume?</label>
+              <textarea id="edit-input" rows="3" placeholder="For example: Add AWS and Kubernetes to my skills. I used AWS Lambda in my internship."></textarea>
+              <div class="edit-actions">
+                <button class="btn btn--primary" id="edit-btn" type="submit">Apply change</button>
+                <button class="btn btn--quiet" id="undo-btn" type="button" hidden>Undo last change</button>
+                <span class="edit-tip">Press <kbd>⌘</kbd>/<kbd>Ctrl</kbd> + <kbd>Enter</kbd> to apply</span>
+              </div>
+            </form>
+          </section>
+          <div class="download" id="download" hidden>
+            <fieldset class="formats">
+              <legend>File format</legend>
+              <label><input type="radio" name="fmt" value="pdf" checked> PDF</label>
+              <label><input type="radio" name="fmt" value="docx"> Word</label>
+              <label><input type="radio" name="fmt" value="md"> Markdown</label>
+            </fieldset>
+            <button class="btn btn--primary" id="download-btn" type="button">Download resume</button>
+            <p class="hint">Read it through before you send it, and fix anything that isn't accurate.</p>
+          </div>
+        </div>
+
+        <div class="panel" role="tabpanel" id="panel-bullets" aria-labelledby="tab-bullets" hidden>
+          <div class="panel-head">
+            <p>Five bullet points rewritten with an action verb, what you did and the result, plus how to close each skill gap.</p>
+            <button class="btn btn--primary" data-run="bullets">Rewrite bullet points</button>
+          </div>
+          <div class="output" id="out-bullets"></div>
+        </div>
+
+        <div class="panel" role="tabpanel" id="panel-questions" aria-labelledby="tab-questions" hidden>
+          <div class="panel-head">
+            <p>Eight questions an interviewer is likely to ask for this role, with a tip for each.</p>
+            <button class="btn btn--primary" data-run="questions">Get interview questions</button>
+          </div>
+          <div class="output" id="out-questions"></div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    Built with FastAPI, sentence-transformers and an open LLM. Your resume isn't saved. It's only sent to the AI service when you use one of the writing tools.
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
